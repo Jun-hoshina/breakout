@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ブロック崩し</title>
+  <style>
+    #wrapper {
+      width: 400px;
+      height: 400px;
+      border: medium solid black;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="wrapper">
+    <canvas id="canvas"></canvas>
+  </div>
+  <script>
+    const WIDTH = 400;
+    const HEIGHT = 400;
+
+    class View {
+
+      constructor(canvas, width, height) {
+        this.canvas = canvas;
+        this.canvas.width = width;
+        this.canvas.height = height;
+        this.ctx = this.canvas.getContext('2d');
+        this.width = width;
+        this.height = height;
+      }
+
+      update(model) {
+        this.ctx.clearRect(0, 0, this.width, this.height);
+
+        this.ctx.beginPath();
+        this.ctx.arc(model.ball.x, model.ball.y, model.ball.r, 0, 2 * Math.PI);
+        this.ctx.stroke();
+        this.ctx.fill();
+
+        this.ctx.beginPath();
+        this.ctx.rect(model.paddle.left(), model.paddle.up(), model.paddle.width, model.paddle.height);
+        this.ctx.stroke();
+        this.ctx.fill();
+
+        model.blocks.forEach(b => {
+          if (b.hidden) { return }
+          this.ctx.beginPath();
+          this.ctx.rect(b.left(), b.up(), b.width, b.height);
+          this.ctx.stroke();
+          this.ctx.fill();
+        });
+      }
+    }
+
+    class Block {
+      constructor(x, y) {
+        this.width = 98;
+        this.height = 18;
+        this.x = x;
+        this.y = y;
+        this.hidden = false;
+      }
+
+      left() {
+        return this.x - (this.width / 2);
+      }
+
+      right() {
+        return this.x + (this.width / 2);
+      }
+
+      up() {
+        return this.y - (this.height / 2);
+      }
+
+      down() {
+        return this.y + (this.height / 2);
+      }
+
+      judge(ball) {
+        if ((this.up() <= ball.down()) && (this.down() >= ball.up())) {
+          if ((ball.x >= this.left()) && (ball.x <= this.right())) {
+            this.hidden = true;
+            ball.reflectY();
+            return
+          }
+        }
+        if ((ball.right() >= this.left()) && (ball.left() <= this.right())) {
+          if ((this.up() <= ball.y) && (this.down() >= ball.y)) {
+            this.hidden = true;
+            ball.reflectX();
+            return
+          }
+        }
+        let temp;
+        temp = ball.vx;
+        let theta;
+        if ((this.left()-ball.x) ** 2 + (ball.y - this.up()) ** 2 <= ball.r ** 2) {
+          this.hidden = true;
+          theta=Math.atan2(ball.y-this.up(),this.left()-ball.x);
+          ball.vx = -Math.cos(2*theta)*ball.vx - Math.sin(2*theta)*(-ball.vy);
+          ball.vy = -(-Math.sin(2*theta)*temp + Math.cos(2*theta)*(-ball.vy));
+          return
+        }
+        if((ball.x - this.right()) ** 2 + (ball.y - this.down()) ** 2 <= ball.r ** 2){
+          this.hidden = true;
+          theta=Math.atan2(ball.y-this.down(),this.right()-ball.x);
+          ball.vx = -Math.cos(2*theta)*ball.vx - Math.sin(2*theta)*(-ball.vy);
+          ball.vy = -(-Math.sin(2*theta)*temp + Math.cos(2*theta)*(-ball.vy));
+          return
+        }
+        if ((this.left()-ball.x) ** 2 + (ball.y - this.down()) ** 2 <= ball.r ** 2) {
+          this.hidden = true;
+          theta=Math.atan2(ball.y-this.down(),this.left()-ball.x);
+          ball.vx = -Math.cos(2*theta)*ball.vx - Math.sin(2*theta)*(-ball.vy);
+          ball.vy = -(-Math.sin(2*theta)*temp + Math.cos(2*theta)*(-ball.vy));
+          return
+        }
+        if((this.right()-ball.x) ** 2 + (ball.y - this.up()) ** 2 <= ball.r ** 2){
+          this.hidden = true;
+          theta=Math.atan2(ball.y-this.up(),this.right()-ball.x);
+          ball.vx = -Math.cos(2*theta)*ball.vx - Math.sin(2*theta)*(-ball.vy);
+          ball.vy = -(-Math.sin(2*theta)*temp + Math.cos(2*theta)*(-ball.vy));
+          return
+        }
+      }
+    }
+
+    class Paddle {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 80;
+        this.height = 10;
+        this.move=2;
+        this.eps=0.001
+      }
+
+      left() {
+        return this.x - (this.width / 2);
+      }
+
+      right() {
+        return this.x + (this.width / 2);
+      }
+
+      up() {
+        return this.y - (this.height / 2);
+      }
+
+      down() {
+        return this.y + (this.height / 2);
+      }
+
+      moveRight(ball) {
+        // if ((this.up() <= ball.down()) && (this.down() >= ball.up())) {
+        //   if ((ball.x >= this.left()+this.move) && (ball.x <= this.right()+this.move)) {
+        //     this.x=ball.x-ball.r-this.width/2-this.eps;
+        //     return
+        //   }
+        // }
+        if ((ball.right() >= this.left()+this.move) && (ball.left() <= this.right()+this.move)) {
+          if ((this.up() <= ball.y) && (this.down() >= ball.y)) {
+            this.x=ball.x-ball.r-this.width/2-this.eps;
+            return
+          }
+        }
+        // if ((ball.x - this.left()+this.move) ** 2 + (ball.y - this.up()) ** 2 < ball.r ** 2 || (ball.x - this.left()+this.move) ** 2 + (ball.y - this.down()) ** 2 < ball.r ** 2) {
+        //   this.x=ball.x-this.width/2-Math.sqrt(ball.r**2-(this.up-ball.y)**2)-this.eps;
+        //   return
+        // }
+        if ((ball.x - (this.right()+this.move)) ** 2 + (ball.y - this.up()) ** 2 <= ball.r ** 2) {
+          this.x=ball.x-this.width/2-Math.sqrt(ball.r**2-(this.up()-ball.y)**2)-this.eps;
+          return
+        }
+        if ((ball.x - (this.right()+this.move)) ** 2 + (ball.y - this.down()) ** 2 <= ball.r ** 2) {
+          this.x=ball.x-this.width/2-Math.sqrt(ball.r**2-(this.down()-ball.y)**2)-this.eps;
+          return
+        }
+        this.x += this.move;
+      }
+
+      moveLeft(ball) {
+        // if ((this.up() <= ball.down()) && (this.down() >= ball.up())) {
+        //   if ((ball.x >= this.left()-this.move) && (ball.x <= this.right()-this.move)) {
+        //     this.x=ball.x+ball.r+this.width/2+this.eps;
+        //     return
+        //   }
+        // }
+        if ((ball.right() >= this.left()-this.move) && (ball.left() <= this.right()-this.move)) {
+          if ((this.up() <= ball.y) && (this.down() >= ball.y)) {
+            this.x=ball.x+ball.r+this.width/2+this.eps;
+            return
+          }
+        }
+        if ((ball.x - (this.left()-this.move)) ** 2 + (ball.y - this.down()) ** 2 <= ball.r ** 2) {
+          this.x=ball.x+this.width/2+Math.sqrt(ball.r**2-(this.down()-ball.y)**2)+this.eps;
+          return
+        }
+        if ((ball.x - (this.left()-this.move)) ** 2 + (ball.y - this.up()) ** 2 <= ball.r ** 2) {
+          this.x=ball.x+this.width/2+Math.sqrt(ball.r**2-(this.up()-ball.y)**2)+this.eps;
+          return
+        }
+        // if ((ball.x - this.right()-this.move) ** 2 + (ball.y - this.down()) ** 2 < ball.r ** 2 || (ball.x - this.right()-this.move) ** 2 + (ball.y - this.up()) ** 2 < ball.r ** 2) {
+        //   this.x=ball.x+this.width/2+Math.sqrt(ball.r**2-(this.up-ball.y)**2)+this.eps;
+        //   return
+        // }
+        this.x -= this.move;
+      }
+
+      judge(ball) {
+        if ((this.up() <= ball.down()) && (this.down() >= ball.up())) {
+          if ((ball.x >= this.left()) && (ball.x <= this.right())) {
+            ball.reflectY();
+            return
+          }
+        }
+        if ((ball.right() >= this.left()) && (ball.left() <= this.right())) {
+          if ((this.up() <= ball.y) && (this.down() >= ball.y)) {
+            ball.reflectX();
+            return
+          }
+        }
+        let temp;
+        temp = ball.vx;
+        let theta;
+        if ((this.left()-ball.x) ** 2 + (ball.y - this.up()) ** 2 <= ball.r ** 2) {
+          theta=Math.atan2(ball.y-this.up(),this.left()-ball.x);
+          ball.vx = -Math.cos(2*theta)*ball.vx - Math.sin(2*theta)*(-ball.vy);
+          ball.vy = -(-Math.sin(2*theta)*temp + Math.cos(2*theta)*(-ball.vy));
+          return
+        }
+        if((ball.x - this.right()) ** 2 + (ball.y - this.down()) ** 2 <= ball.r ** 2){
+          theta=Math.atan2(ball.y-this.down(),this.right()-ball.x);
+          ball.vx = -Math.cos(2*theta)*ball.vx - Math.sin(2*theta)*(-ball.vy);
+          ball.vy = -(-Math.sin(2*theta)*temp + Math.cos(2*theta)*(-ball.vy));
+          return
+        }
+        if ((this.left()-ball.x) ** 2 + (ball.y - this.down()) ** 2 <= ball.r ** 2) {
+          theta=Math.atan2(ball.y-this.down(),this.left()-ball.x);
+          ball.vx = -Math.cos(2*theta)*ball.vx - Math.sin(2*theta)*(-ball.vy);
+          ball.vy = -(-Math.sin(2*theta)*temp + Math.cos(2*theta)*(-ball.vy));
+          return
+        }
+        if((this.right()-ball.x) ** 2 + (ball.y - this.up()) ** 2 <= ball.r ** 2){
+          theta=Math.atan2(ball.y-this.up(),this.right()-ball.x);
+          ball.vx = -Math.cos(2*theta)*ball.vx - Math.sin(2*theta)*(-ball.vy);
+          ball.vy = -(-Math.sin(2*theta)*temp + Math.cos(2*theta)*(-ball.vy));
+          return
+        }
+      }
+
+      // isCollided(ball) {
+
+      //   if (this.up() <= ball.down() && this.down() >= ball.up()) {
+      //     if (ball.right() >= this.left() && ball.left() <= this.right()) {
+      //       return true;
+      //     }
+      //   }
+      //   return false;
+      // }
+    }
+
+    class Ball {
+
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = 0.5;
+        this.vy = 1;
+        this.r = 10;
+      }
+
+      next() {
+        this.x += this.vx;
+        this.y += this.vy;
+      }
+
+      left() {
+        return this.x - this.r;
+      }
+
+      right() {
+        return this.x + this.r;
+      }
+
+      up() {
+        return this.y - this.r;
+      }
+
+      down() {
+        return this.y + this.r;
+      }
+
+      reflectY() {
+        this.vy *= -1;
+      }
+
+      reflectX() {
+        this.vx *= -1;
+      }
+    }
+
+    class BlockBreaking {
+
+      constructor(width, height) {
+        this.width = width;
+        this.height = height;
+
+        const initX = 100;
+        const initY = 200;
+        this.ball = new Ball(initX, initY);
+
+        this.paddle = new Paddle(200, 300);
+
+        this.blocks = [];
+
+        for (let i = 0; i < 4; i++) {
+          for (let j = 0; j < 3; j++) {
+            this.blocks.push(new Block((j + 1) * 100, (i + 4) * 20));
+          }
+        }
+
+        this.gameOver = false;
+      }
+
+      next() {
+        if (this.ball.down() > this.height) {
+          this.ball.reflectY();
+          // this.gameOver = true;
+        }
+
+        if (this.ball.up() < 0) {
+          this.ball.reflectY();
+        }
+        if (this.ball.left() < 0 || this.ball.right() > this.width) {
+          this.ball.reflectX();
+        }
+
+        // if (this.paddle.isCollided(this.ball)) {
+        //   this.ball.reflectY();
+        // }
+
+        this.paddle.judge(this.ball);
+
+        this.blocks.forEach(b => {
+          if (b.hidden) { return }
+          b.judge(this.ball);
+        });
+
+        if (this.blocks.every(b => b.hidden)) { this.gameOver = true; }
+
+        this.ball.next();
+      }
+
+      moveRight(ball) {
+        if (this.paddle.right()+this.paddle.move > this.width) {
+          this.paddle.x=this.width-this.paddle.width/2;
+          return 
+        }
+        this.paddle.moveRight(ball);
+      }
+
+      moveLeft(ball) {
+        if (this.paddle.left()-this.paddle.move < 0) {
+          this.paddle.x=this.paddle.width/2;
+          return 
+        }
+        this.paddle.moveLeft(ball);
+      }
+    }
+
+    class Frame {
+      constructor(width, height, canvas, window) {
+        this.width = width;
+        this.height = height;
+        this.intervalId = null;
+        this.keyEventListener = null;
+        this.view = new View(canvas, this.width, this.height);
+        this.model = new BlockBreaking(this.width, this.height);
+        this.window = window;
+        this.keydown='';
+      }
+
+      start() {
+        this.intervalId = setInterval(() => this.next(), 10);
+        this.window.addEventListener('keydown', e=>{this.keydown=e.key;});
+        this.window.addEventListener('keyup', e=>{this.keydown='';});
+      }
+
+      handleKeyEvent(key) {
+        if (key === 'ArrowRight') {
+          this.model.moveRight(this.model.ball);
+        }
+        if (key === 'ArrowLeft') {
+          this.model.moveLeft(this.model.ball);
+        }
+      }
+
+      next() {
+        this.handleKeyEvent(this.keydown)
+        this.model.next();
+        this.view.update(this.model);
+        if (this.model.gameOver) {
+          this.stop();
+        }
+      }
+
+      stop() {
+        clearInterval(this.intervalId);
+        this.keydown='';
+        // this.window.removeEventListener('keydown', this.keyEventListener);
+        // this.window.removeEventListener('keyup', this.keyEventListener);
+      }
+    }
+
+    const canvas = document.getElementById('canvas');
+    const frame = new Frame(WIDTH, HEIGHT, canvas, window);
+    frame.start();
+  </script>
+</body>
+
+</html>
